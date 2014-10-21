@@ -127,5 +127,149 @@ namespace FiledRecipes.Domain
                 handler(this, e);
             }
         }
+
+
+        public void Load()
+        {
+            List<IRecipe> recipes = new List<IRecipe>(10);
+            RecipeReadStatus recipeReadStatus = RecipeReadStatus.Indefinite;
+            Ingredient ingredients = new Ingredient();
+            string[] splittedLine;
+            string line;
+
+            try
+            {
+                // Open file, automaticly close it afterwards
+                using(StreamReader fileStream = new StreamReader(@"..\..\App_Data\Recipes.txt"))
+                {
+                    // Read lines while there are lines to read in the file.
+                    while((line = fileStream.ReadLine()) != null)
+                    {
+                        // Skip line if its empty
+                        if (line.Length <= 1) continue;
+
+                        // Check if we are entering a new section
+                        if (line == SectionRecipe)
+                        {
+                            recipeReadStatus = RecipeReadStatus.New;
+                        }
+                        else if (line == SectionIngredients)
+                        {
+                            recipeReadStatus = RecipeReadStatus.Ingredient;
+                        }
+                        else if (line == SectionInstructions)
+                        {
+                            recipeReadStatus = RecipeReadStatus.Instruction;
+                        }
+
+                        // Its in a section with values (line contains values)
+                        else
+                        {
+                            if (recipeReadStatus == RecipeReadStatus.New)
+                            {
+                                recipes.Add(new Recipe(line));
+                                // recipeReadStatus = RecipeReadStatus.Indefinite;
+                            }
+                            else if (recipeReadStatus == RecipeReadStatus.Ingredient)
+                            {
+                                // Split line and check count.
+                                if( ( splittedLine = line.Split(';') ).Length == 3 )
+                                {
+                                    // Assign values
+                                    ingredients.Amount = splittedLine[0];
+                                    ingredients.Measure = splittedLine[1];
+                                    ingredients.Name = splittedLine[2];
+
+                                    recipes.Last().Add(ingredients);
+                                }
+                                else
+                                {
+                                    throw new FileFormatException("Could not parse file. Row contains wrong number of values.");
+                                }
+                            }
+                            else if (recipeReadStatus == RecipeReadStatus.Instruction)
+                            {
+                                // Assign value
+                                recipes.Last().Add(line);
+                            }
+                            else
+                            {
+                                throw new FileFormatException("Could not parse file. No known sections found.");
+                            }
+                        }
+                    } // Loop ends
+                } // File closed
+
+                recipes.Sort();
+
+                // Set local class field reference to created recipe list.
+                _recipes = recipes;
+
+                // Notify that the file remains unmodified.
+                IsModified = false;
+
+                // Trigger event, let them know that we have read the file.
+                OnRecipesChanged(EventArgs.Empty);
+            }
+            catch(Exception e)
+            {
+                // Write out error message
+                Console.BackgroundColor = ConsoleColor.Red;
+                Console.ForegroundColor = ConsoleColor.White;
+                Console.WriteLine(e.Message);
+                Console.ResetColor();
+            }
+            
+        }
+
+        public void Save()
+        {
+            try
+            {
+                // Open file, automaticly close it afterwards
+                using (StreamWriter fileStream = new StreamWriter(@"..\..\App_Data\Recipes.txt"))
+                {
+                    foreach(IRecipe recipe in _recipes)
+                    {
+                        // Write Section Recipe
+                        fileStream.WriteLine(SectionRecipe);
+
+                        // Write Recipe name
+                        fileStream.WriteLine(recipe.Name);
+
+                        // Write Section Ingredients
+                        fileStream.WriteLine(SectionIngredients);
+
+                        foreach(Ingredient ingredient in recipe.Ingredients)
+                        {
+                            fileStream.WriteLine(String.Join(";", ingredient.Amount, ingredient.Measure, ingredient.Name));
+                        }
+
+                        // Write Section Instructions
+                        fileStream.WriteLine(SectionInstructions);
+
+                        foreach(string instruction in recipe.Instructions)
+                        {
+                            fileStream.WriteLine(instruction);
+                        }
+                    }
+
+                    // Notify that the file is now modified.
+                    IsModified = true;
+
+                    // Trigger event, let them know that we have written to the file.
+                    OnRecipesChanged(EventArgs.Empty);
+                }
+            }
+            catch(Exception e)
+            {
+                // Write out error message
+                Console.BackgroundColor = ConsoleColor.Red;
+                Console.ForegroundColor = ConsoleColor.White;
+                Console.WriteLine(e.Message);
+                Console.ResetColor();
+            }
+
+        }
     }
 }
