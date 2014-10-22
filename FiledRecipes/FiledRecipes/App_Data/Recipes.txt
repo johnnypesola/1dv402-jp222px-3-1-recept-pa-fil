@@ -1,4 +1,19 @@
 ﻿[Recept]
+Kanelbulle
+[Ingredienser]
+3;dl;kanel
+5;st;bullar
+[Instruktioner]
+Strö kanelen över bullen.
+[Recept]
+Örtsoppa
+[Ingredienser]
+1;st;svartpeppar
+2;st;saltkort
+[Instruktioner]
+Blanda dem.
+Tillsätt önskad mängd vatten.
+[Recept]
 Filmjölkslimpa
 [Ingredienser]
 4,5;dl;filmjölk

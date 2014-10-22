@@ -128,148 +128,123 @@ namespace FiledRecipes.Domain
             }
         }
 
-
         public void Load()
         {
-            List<IRecipe> recipes = new List<IRecipe>(10);
+            List<IRecipe> recipes = new List<IRecipe>(80);
             RecipeReadStatus recipeReadStatus = RecipeReadStatus.Indefinite;
             Ingredient ingredients = new Ingredient();
             string[] splittedLine;
             string line;
 
-            try
+            // Open file, automaticly close it afterwards
+            using (StreamReader fileStream = new StreamReader(_path))
             {
-                // Open file, automaticly close it afterwards
-                using(StreamReader fileStream = new StreamReader(@"..\..\App_Data\Recipes.txt"))
+                // Read lines while there are lines to read in the file.
+                while((line = fileStream.ReadLine()) != null)
                 {
-                    // Read lines while there are lines to read in the file.
-                    while((line = fileStream.ReadLine()) != null)
+                    // Skip line if its empty
+                    if (line.Length <= 1) continue;
+
+                    // Check if we are entering a new section
+                    if (line == SectionRecipe)
                     {
-                        // Skip line if its empty
-                        if (line.Length <= 1) continue;
+                        recipeReadStatus = RecipeReadStatus.New;
+                    }
+                    else if (line == SectionIngredients)
+                    {
+                        recipeReadStatus = RecipeReadStatus.Ingredient;
+                    }
+                    else if (line == SectionInstructions)
+                    {
+                        recipeReadStatus = RecipeReadStatus.Instruction;
+                    }
 
-                        // Check if we are entering a new section
-                        if (line == SectionRecipe)
+                    // Its in a section with values (line contains values)
+                    else
+                    {
+                        if (recipeReadStatus == RecipeReadStatus.New)
                         {
-                            recipeReadStatus = RecipeReadStatus.New;
+                            recipes.Add(new Recipe(line));
                         }
-                        else if (line == SectionIngredients)
+                        else if (recipeReadStatus == RecipeReadStatus.Ingredient)
                         {
-                            recipeReadStatus = RecipeReadStatus.Ingredient;
-                        }
-                        else if (line == SectionInstructions)
-                        {
-                            recipeReadStatus = RecipeReadStatus.Instruction;
-                        }
+                            // Split line and check count.
+                            if( ( splittedLine = line.Split(';') ).Length == 3 )
+                            {
+                                // Assign values
+                                ingredients.Amount = splittedLine[0];
+                                ingredients.Measure = splittedLine[1];
+                                ingredients.Name = splittedLine[2];
 
-                        // Its in a section with values (line contains values)
-                        else
-                        {
-                            if (recipeReadStatus == RecipeReadStatus.New)
-                            {
-                                recipes.Add(new Recipe(line));
-                                // recipeReadStatus = RecipeReadStatus.Indefinite;
-                            }
-                            else if (recipeReadStatus == RecipeReadStatus.Ingredient)
-                            {
-                                // Split line and check count.
-                                if( ( splittedLine = line.Split(';') ).Length == 3 )
-                                {
-                                    // Assign values
-                                    ingredients.Amount = splittedLine[0];
-                                    ingredients.Measure = splittedLine[1];
-                                    ingredients.Name = splittedLine[2];
-
-                                    recipes.Last().Add(ingredients);
-                                }
-                                else
-                                {
-                                    throw new FileFormatException("Could not parse file. Row contains wrong number of values.");
-                                }
-                            }
-                            else if (recipeReadStatus == RecipeReadStatus.Instruction)
-                            {
-                                // Assign value
-                                recipes.Last().Add(line);
+                                recipes.Last().Add(ingredients);
                             }
                             else
                             {
-                                throw new FileFormatException("Could not parse file. No known sections found.");
+                                throw new FileFormatException("Could not parse file. Row contains wrong number of values.");
                             }
                         }
-                    } // Loop ends
-                } // File closed
+                        else if (recipeReadStatus == RecipeReadStatus.Instruction)
+                        {
+                            // Assign value
+                            recipes.Last().Add(line);
+                        }
+                        else
+                        {
+                            throw new FileFormatException("Could not parse file. No known sections found.");
+                        }
+                    }
+                } // Loop ends
+            } // File closed
 
-                recipes.Sort();
+            recipes.Sort();
 
-                // Set local class field reference to created recipe list.
-                _recipes = recipes;
+            // Set local class field reference to created recipe list.
+            _recipes = recipes;
 
-                // Notify that the file remains unmodified.
-                IsModified = false;
+            // Reset IsModified, the file has not been modified since it was saved.
+            IsModified = false;
 
-                // Trigger event, let them know that we have read the file.
-                OnRecipesChanged(EventArgs.Empty);
-            }
-            catch(Exception e)
-            {
-                // Write out error message
-                Console.BackgroundColor = ConsoleColor.Red;
-                Console.ForegroundColor = ConsoleColor.White;
-                Console.WriteLine(e.Message);
-                Console.ResetColor();
-            }
-            
+            // Trigger event, let them know that we have read the file.
+            OnRecipesChanged(EventArgs.Empty);
+
         }
 
         public void Save()
         {
-            try
+            // Open file, automaticly close it afterwards
+            using (StreamWriter fileStream = new StreamWriter(_path))
             {
-                // Open file, automaticly close it afterwards
-                using (StreamWriter fileStream = new StreamWriter(@"..\..\App_Data\Recipes.txt"))
+                foreach(IRecipe recipe in _recipes)
                 {
-                    foreach(IRecipe recipe in _recipes)
+                    // Write Section Recipe
+                    fileStream.WriteLine(SectionRecipe);
+
+                    // Write Recipe name
+                    fileStream.WriteLine(recipe.Name);
+
+                    // Write Section Ingredients
+                    fileStream.WriteLine(SectionIngredients);
+
+                    foreach(Ingredient ingredient in recipe.Ingredients)
                     {
-                        // Write Section Recipe
-                        fileStream.WriteLine(SectionRecipe);
-
-                        // Write Recipe name
-                        fileStream.WriteLine(recipe.Name);
-
-                        // Write Section Ingredients
-                        fileStream.WriteLine(SectionIngredients);
-
-                        foreach(Ingredient ingredient in recipe.Ingredients)
-                        {
-                            fileStream.WriteLine(String.Join(";", ingredient.Amount, ingredient.Measure, ingredient.Name));
-                        }
-
-                        // Write Section Instructions
-                        fileStream.WriteLine(SectionInstructions);
-
-                        foreach(string instruction in recipe.Instructions)
-                        {
-                            fileStream.WriteLine(instruction);
-                        }
+                        fileStream.WriteLine(String.Join(";", ingredient.Amount, ingredient.Measure, ingredient.Name));
                     }
 
-                    // Notify that the file is now modified.
-                    IsModified = true;
+                    // Write Section Instructions
+                    fileStream.WriteLine(SectionInstructions);
 
-                    // Trigger event, let them know that we have written to the file.
-                    OnRecipesChanged(EventArgs.Empty);
+                    foreach(string instruction in recipe.Instructions)
+                    {
+                        fileStream.WriteLine(instruction);
+                    }
                 }
             }
-            catch(Exception e)
-            {
-                // Write out error message
-                Console.BackgroundColor = ConsoleColor.Red;
-                Console.ForegroundColor = ConsoleColor.White;
-                Console.WriteLine(e.Message);
-                Console.ResetColor();
-            }
 
+            // Reset IsModified, the file has not been modified since it was saved.
+            IsModified = false;
+
+            // Trigger event, let them know that we have written to the file.
+            OnRecipesChanged(EventArgs.Empty);
         }
     }
 }

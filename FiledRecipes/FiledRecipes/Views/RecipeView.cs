@@ -33,7 +33,7 @@ namespace FiledRecipes.Views
             }
 
             // Display instructions
-            this.ShowPanel("Instruktioner", App.Controls.MessagePanelOptions.Basic);
+            ShowPanel("Instruktioner", App.Controls.MessagePanelOptions.Basic);
             
             foreach (string instruction in recipe.Instructions)
             {
